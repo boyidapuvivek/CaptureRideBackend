@@ -4,7 +4,6 @@ import { User } from "../models/user.models.js";
 import { uploadToCloudinary } from "../utils/cloudinary.js";
 import { ApiResponce } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
-import { application } from "express";
 
 const options = {
   httpOnly: true,
@@ -54,21 +53,21 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "Username or the Email already exists");
   }
 
-  const avatarLocalPath = req.files?.avatar[0]?.path;
+  // const avatarLocalPath = req.files?.avatar[0]?.path;
 
-  if (!avatarLocalPath) {
-    throw new ApiError(400, "Avatar is needed");
-  }
-  const avatar = await uploadToCloudinary(avatarLocalPath);
+  // if (!avatarLocalPath) {
+  //   throw new ApiError(400, "Avatar is needed");
+  // }
+  // const avatar = await uploadToCloudinary(avatarLocalPath);
 
-  if (!avatar) {
-    throw new ApiError(400, "Avatar field is required");
-  }
+  // if (!avatar) {
+  //   throw new ApiError(400, "Avatar field is required");
+  // }
 
   const user = await User.create({
-    username: username.toLowerCase(),
-    avatar: avatar.url,
+    username,
     email,
+    // avatar: avatar.url,
     password,
   });
 
@@ -121,11 +120,6 @@ const loginUser = asyncHandler(async (req, res) => {
     "-password -refreshToken"
   );
 
-  const options = {
-    httpOnly: true,
-    secure: true,
-  };
-
   return res
     .status(200)
     .cookie("accessToken", accessToken, options)
@@ -134,7 +128,7 @@ const loginUser = asyncHandler(async (req, res) => {
       new ApiResponce(
         200,
         {
-          user: loggedUser,
+          userData: loggedUser,
           refreshToken,
           accessToken,
         },
@@ -143,7 +137,7 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 });
 
-const logoutUser = async (req, res) => {
+const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
@@ -154,17 +148,12 @@ const logoutUser = async (req, res) => {
     }
   );
 
-  const options = {
-    httpOnly: true,
-    secure: true,
-  };
-
   return res
     .status(200)
     .clearCookie("accessToken", options)
     .clearCookie("refreshToken", options)
     .json(new ApiResponce(200, {}, "User logged-out"));
-};
+});
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const incommingRefreshToken =
@@ -196,11 +185,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       user._id
     );
 
-    const options = {
-      httpOnly: true,
-      secure: true,
-    };
-
     return res
       .status(200)
       .cookie("accessToken", accessToken, options)
@@ -217,4 +201,30 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req?.body;
+  console.log(oldPassword, newPassword, req.cookies);
+
+  const user = await User.findOne({ refreshToken: req.cookies?.refreshToken });
+
+  const isPasswordValid = user.isPasswordCorrect(oldPassword);
+
+  if (!isPasswordValid) {
+    throw new ApiError(400, "Old Password entered is incorrect");
+  }
+
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+
+  res
+    .status(200)
+    .json(new ApiResponce(200, {}, "Successfully changed password"));
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+};

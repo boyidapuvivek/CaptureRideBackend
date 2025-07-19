@@ -19,9 +19,9 @@ const userSchema = new mongoose.Schema(
       requierd: true,
       unique: true,
     },
-    avatar: {
-      type: String,
-    },
+    // avatar: {
+    //   type: String,
+    // },
     refreshToken: {
       type: String,
     },
