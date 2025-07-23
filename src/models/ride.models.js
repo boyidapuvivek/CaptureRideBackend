@@ -1,12 +1,12 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const rideSchema = new mongoose.Schema({
-  room: {
+  roomNumber: {
     type: String,
     required: true,
-    unique: true,
+    unique: false,
   },
-  name: {
+  customerName: {
     type: String,
     required: true,
   },
@@ -14,7 +14,7 @@ const rideSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  bikeNumber: {
+  vehicleNumber: {
     type: String,
     required: true,
   },
@@ -26,11 +26,10 @@ const rideSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  userPhoto: {
+  customerPhoto: {
     type: String,
     required: true,
   },
 });
 
-const Ride = mongoose.model("Ride", rideSchema);
-module.exports = Ride;
+export const Ride = mongoose.model("Ride", rideSchema);
