@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      requierd: true,
+      required: true,
       unique: true,
     },
     // avatar: {

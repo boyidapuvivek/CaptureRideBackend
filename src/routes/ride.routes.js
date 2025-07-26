@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { addRide } from "../controllers/ride.controller.js";
+import { addRide, getRides } from "../controllers/ride.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
+import verifyJwt from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
@@ -19,8 +20,11 @@ router.route("/addRide").post(
       maxCount: 1,
     },
   ]),
+  verifyJwt,
   addRide
 );
+
+router.route("/getRides").get(verifyJwt, getRides);
 
 export default router;
 // const express = require("express");
