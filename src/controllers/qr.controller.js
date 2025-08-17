@@ -71,12 +71,9 @@ const deleteQr = asyncHandler(async (req, res) => {
   const cloudinaryRes = await deleteFromCloudinary(qr?.qrPhotoPublicId)
 
   if (cloudinaryRes.result !== "ok") {
-    console.log("❤️", cloudinaryRes)
-
     throw new ApiError(500, "Failed to delete image from Cloudinary")
   }
 
-  // Delete from DB
   await qr.deleteOne()
 
   res.status(200).json(new ApiResponce(200, {}, "QR deleted successfully"))

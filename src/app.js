@@ -18,8 +18,10 @@ app.use(cookieParser())
 import userRouter from "./routes/user.routes.js"
 import rideRoute from "./routes/ride.routes.js"
 import qrRouter from "./routes/qr.routes.js"
+import bikeRouter from "./routes/bike.routes.js"
 
 app.use("/api/v1/user", userRouter)
 app.use("/api/v1/ride", rideRoute)
 app.use("/api/v1/qr", qrRouter)
+app.use("/api/v1/bike", bikeRouter)
 export { app }

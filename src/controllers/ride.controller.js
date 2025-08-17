@@ -4,8 +4,7 @@ import { Ride } from "../models/ride.models.js"
 import { ApiResponce } from "../utils/ApiResponse.js"
 import { processRidePhotosInBackground } from "../utils/processRidePhotosInBackground.js"
 import fs from "fs"
-import { User } from "../models/user.models.js"
-import { log } from "console"
+import { deleteFromCloudinary } from "../utils/cloudinary.js"
 
 const addRide = asyncHandler(async (req, res) => {
   const { roomNumber, customerName, phoneNumber, vehicleNumber } = req.body
@@ -37,6 +36,9 @@ const addRide = asyncHandler(async (req, res) => {
       aadharPhoto: "pending",
       dlPhoto: "pending",
       customerPhoto: "pending",
+      aadharPublicPhoto: "pending",
+      dlPublicPhoto: "pending",
+      customerPublicPhoto: "pending",
     })
 
     if (!ride) {
@@ -145,9 +147,10 @@ const getRides = asyncHandler(async (req, res) => {
 
 const deleteRide = asyncHandler(async (req, res) => {
   const userId = req?.user?._id
-  const { rideId } = req?.query
+  const rideId = req?.query?.id
 
   if (!rideId) {
+    console.log(req?.query)
     throw new ApiError(400, "rideId is required in query")
   }
 
@@ -158,20 +161,14 @@ const deleteRide = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Optional: Delete associated photos from disk if you stored them locally
-    // const photoPaths = [
-    //   ride.aadharPhoto,
-    //   ride.dlPhoto,
-    //   ride.customerPhoto,
-    // ]
+    // Delete associated photos from Cloudinary (if they exist)
+    const photoPaths = [
+      ride.aadharPublicPhoto,
+      ride.dlPublicPhoto,
+      ride.customerPublicPhoto,
+    ].filter(Boolean) // remove undefined/null values
 
-    // await Promise.all(
-    //   photoPaths.map((path) => {
-    //     if (path && path !== "pending") {
-    //       return fs.promises.unlink(path).catch(() => {}) // silently ignore if not found
-    //     }
-    //   })
-    // )
+    await Promise.all(photoPaths.map((path) => deleteFromCloudinary(path)))
 
     await Ride.deleteOne({ _id: rideId, userId })
 

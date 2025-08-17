@@ -35,6 +35,18 @@ const rideSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    aadharPublicPhoto: {
+      type: String,
+      required: true,
+    },
+    dlPublicPhoto: {
+      type: String,
+      required: true,
+    },
+    customerPublicPhoto: {
+      type: String,
+      required: true,
+    },
     status: {
       type: String,
       enum: ["processing", "completed", "failed", "partial_failure"],
