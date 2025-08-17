@@ -1,7 +1,5 @@
 import { v2 as cloudinary } from "cloudinary"
-import fs from "fs"
 import { ApiError } from "./ApiError.js"
-import { log } from "console"
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
@@ -9,62 +7,65 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_SECRET_KEY,
 })
 
-// OPTIMIZATION: Enhanced upload with compression and faster settings
+// Upload from buffer (memory storage)
+const uploadToCloudinaryFromBuffer = async (buffer, filename) => {
+  try {
+    if (!buffer) return null
+
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader
+        .upload_stream(
+          {
+            resource_type: "auto",
+            public_id: `ride_documents/${Date.now()}-${filename}`,
+            quality: "auto:good",
+            fetch_format: "auto",
+            flags: "progressive",
+            timeout: 120000,
+            chunk_size: 6000000,
+            folder: "ride_documents",
+            eager: [
+              { width: 300, height: 300, crop: "thumb", quality: "auto:low" },
+            ],
+            eager_async: true,
+          },
+          (error, result) => {
+            if (error) {
+              console.error("Cloudinary upload error:", error)
+              reject(error)
+            } else {
+              resolve(result)
+            }
+          }
+        )
+        .end(buffer)
+    })
+  } catch (error) {
+    console.error("Cloudinary upload error:", error)
+    return null
+  }
+}
+
+// Keep the original function for backward compatibility (if needed)
 const uploadToCloudinary = async (localFilePath) => {
   try {
     if (!localFilePath) return null
 
     const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "auto",
-      // PERFORMANCE OPTIMIZATIONS:
-      quality: "auto:good", // Automatic quality optimization
-      fetch_format: "auto", // Automatic format optimization (WebP, AVIF)
-      flags: "progressive", // Progressive JPEG loading
-      timeout: 120000, // 2 minute timeout
-      chunk_size: 6000000, // 6MB chunks for better upload speed
-      // Add folder organization
+      quality: "auto:good",
+      fetch_format: "auto",
+      flags: "progressive",
+      timeout: 120000,
+      chunk_size: 6000000,
       folder: "ride_documents",
-      // Generate smaller versions for thumbnails if needed
       eager: [{ width: 300, height: 300, crop: "thumb", quality: "auto:low" }],
-      eager_async: true, // Don't wait for eager transformations
-    })
-
-    // OPTIMIZATION: Non-blocking file cleanup
-    fs.promises.unlink(localFilePath).catch((err) => {
-      console.warn(`Failed to delete temp file ${localFilePath}:`, err.message)
+      eager_async: true,
     })
 
     return response
   } catch (error) {
     console.error("Cloudinary upload error:", error)
-
-    // OPTIMIZATION: Non-blocking cleanup on error
-    fs.promises.unlink(localFilePath).catch((err) => {
-      console.warn(
-        `Failed to delete temp file on error ${localFilePath}:`,
-        err.message
-      )
-    })
-
-    return null
-  }
-}
-
-// ALTERNATIVE: Batch upload function for even better performance
-const uploadMultipleToCloudinary = async (filePaths) => {
-  const uploadPromises = filePaths.map((path) => uploadToCloudinary(path))
-
-  try {
-    const results = await Promise.allSettled(uploadPromises)
-
-    return results.map((result, index) => ({
-      success: result.status === "fulfilled" && result.value !== null,
-      data: result.status === "fulfilled" ? result.value : null,
-      error: result.status === "rejected" ? result.reason : null,
-      originalPath: filePaths[index],
-    }))
-  } catch (error) {
-    console.error("Batch upload error:", error)
     return null
   }
 }
@@ -72,10 +73,12 @@ const uploadMultipleToCloudinary = async (filePaths) => {
 const deleteFromCloudinary = async (publicId) => {
   if (!publicId) {
     throw new ApiError(401, "Public Id is required for cloudinary delete")
-    console.log("Public Id is required for cloudinary delete")
-    return
   }
   return await cloudinary.uploader.destroy(publicId)
 }
 
-export { uploadToCloudinary, uploadMultipleToCloudinary, deleteFromCloudinary }
+export {
+  uploadToCloudinary,
+  uploadToCloudinaryFromBuffer,
+  deleteFromCloudinary,
+}

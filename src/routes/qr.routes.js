@@ -5,6 +5,7 @@ import { addQr, deleteQr, getQr } from "../controllers/qr.controller.js"
 
 const router = Router()
 
+// Keep the same structure but ensure multer is using memory storage
 router.route("/addQR").post(
   verifyJwt,
   upload.fields([

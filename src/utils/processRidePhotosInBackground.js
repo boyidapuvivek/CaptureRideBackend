@@ -1,15 +1,19 @@
 import { Ride } from "../models/ride.models.js"
-import { uploadToCloudinary } from "./cloudinary.js"
+import { uploadToCloudinaryFromBuffer } from "./cloudinary.js"
 
-export async function processRidePhotosInBackground(rideID, filePaths) {
+export async function processRidePhotosInBackground(rideID, fileData) {
   try {
-    const { aadharLocalPath, dlLocalPath, customerPhotoLocalPath } = filePaths
+    const { aadharFile, dlFile, customerPhotoFile } = fileData
 
     const uploadPromise = [
-      uploadToCloudinary(aadharLocalPath),
-      uploadToCloudinary(dlLocalPath),
-      uploadToCloudinary(customerPhotoLocalPath),
+      uploadToCloudinaryFromBuffer(aadharFile.buffer, aadharFile.originalname),
+      uploadToCloudinaryFromBuffer(dlFile.buffer, dlFile.originalname),
+      uploadToCloudinaryFromBuffer(
+        customerPhotoFile.buffer,
+        customerPhotoFile.originalname
+      ),
     ]
+
     const [aadharPhoto, dlPhoto, customerPhoto] =
       await Promise.allSettled(uploadPromise)
 
@@ -23,6 +27,7 @@ export async function processRidePhotosInBackground(rideID, filePaths) {
       updateData.aadharPublicPhoto = aadharPhoto.value.public_id
     } else {
       updateData.aadharPhotoError = "Upload Failed"
+      console.error("Aadhar upload failed:", aadharPhoto.reason)
     }
 
     if (dlPhoto.status === "fulfilled" && dlPhoto.value) {
@@ -30,6 +35,7 @@ export async function processRidePhotosInBackground(rideID, filePaths) {
       updateData.dlPublicPhoto = dlPhoto.value.public_id
     } else {
       updateData.dlPhotoError = "Upload Failed"
+      console.error("DL upload failed:", dlPhoto.reason)
     }
 
     if (customerPhoto.status === "fulfilled" && customerPhoto.value) {
@@ -37,6 +43,7 @@ export async function processRidePhotosInBackground(rideID, filePaths) {
       updateData.customerPublicPhoto = customerPhoto.value.public_id
     } else {
       updateData.customerPhotoError = "Upload Failed"
+      console.error("Customer photo upload failed:", customerPhoto.reason)
     }
 
     const hasErrors =
@@ -48,7 +55,6 @@ export async function processRidePhotosInBackground(rideID, filePaths) {
     }
 
     await Ride.findByIdAndUpdate(rideID, updateData)
-    console.log(`Background processing completed for ride ${rideID}`)
   } catch (error) {
     console.error(`Background processing failed for ride ${rideID}:`, error)
 

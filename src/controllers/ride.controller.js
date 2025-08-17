@@ -3,7 +3,6 @@ import { asyncHandler } from "../utils/asyncHandler.js"
 import { Ride } from "../models/ride.models.js"
 import { ApiResponce } from "../utils/ApiResponse.js"
 import { processRidePhotosInBackground } from "../utils/processRidePhotosInBackground.js"
-import fs from "fs"
 import { deleteFromCloudinary } from "../utils/cloudinary.js"
 
 const addRide = asyncHandler(async (req, res) => {
@@ -17,12 +16,21 @@ const addRide = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All Fields are required")
   }
 
-  const aadharLocalPath = req?.files?.aadharPhoto?.[0]?.path
-  const dlLocalPath = req?.files?.dlPhoto?.[0]?.path
-  const customerPhotoLocalPath = req?.files?.customerPhoto?.[0]?.path
+  // For memory storage, files are in buffer format
+  const aadharFile = req?.files?.aadharPhoto?.[0]
+  const dlFile = req?.files?.dlPhoto?.[0]
+  const customerPhotoFile = req?.files?.customerPhoto?.[0]
 
-  if (!aadharLocalPath || !dlLocalPath || !customerPhotoLocalPath) {
+  if (!aadharFile || !dlFile || !customerPhotoFile) {
     throw new ApiError(400, "All photos (Aadhar, DL, Customer) are required")
+  }
+
+  // Validate that files have buffers (memory storage)
+  if (!aadharFile.buffer || !dlFile.buffer || !customerPhotoFile.buffer) {
+    throw new ApiError(
+      400,
+      "Invalid file format - files must be uploaded properly"
+    )
   }
 
   try {
@@ -57,22 +65,14 @@ const addRide = asyncHandler(async (req, res) => {
       )
     )
 
+    // Process with file buffers instead of paths
     processRidePhotosInBackground(ride._id, {
-      aadharLocalPath,
-      dlLocalPath,
-      customerPhotoLocalPath,
+      aadharFile,
+      dlFile,
+      customerPhotoFile,
     })
   } catch (error) {
-    // Promise.all([
-    //   fs.promises.unlink(aadharLocalPath).catch(() => {}),
-    //   fs.promises.unlink(dlLocalPath).catch(() => {}),
-    //   fs.promises.unlink(customerPhotoLocalPath).catch(() => {}),
-    // ]);
-    //insterd of this :
-
-    ;[aadharLocalPath, dlLocalPath, customerPhotoLocalPath].forEach((path) => {
-      if (path) fs.promises.unlink(path).catch(() => {})
-    })
+    // No need to delete files from disk since we're using memory storage
     throw error
   }
 })
@@ -83,18 +83,15 @@ const getRides = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10 } = req.query
     const skip = (page - 1) * limit
 
-    // Fixed: Use find() instead of findById() for multiple documents
-    // Fixed: Add filter condition for counting user's rides
     const [rides, total] = await Promise.all([
       Ride.find({ userId: userId })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
         .lean(),
-      Ride.countDocuments({ userId: userId }), // Fixed: Count only user's rides
+      Ride.countDocuments({ userId: userId }),
     ])
 
-    // Modified: Return empty array instead of throwing error
     if (!rides || rides.length === 0) {
       return res.status(200).json(
         new ApiResponce(
@@ -133,8 +130,6 @@ const getRides = asyncHandler(async (req, res) => {
   } catch (error) {
     console.error("Error retrieving rides:", error)
 
-    // Fixed: Remove duplicate error handling since asyncHandler should handle this
-    // But if you want explicit error handling, make sure not to send response twice
     if (!res.headersSent) {
       return res.status(500).json({
         success: false,
@@ -150,7 +145,6 @@ const deleteRide = asyncHandler(async (req, res) => {
   const rideId = req?.query?.id
 
   if (!rideId) {
-    console.log(req?.query)
     throw new ApiError(400, "rideId is required in query")
   }
 
@@ -166,7 +160,7 @@ const deleteRide = asyncHandler(async (req, res) => {
       ride.aadharPublicPhoto,
       ride.dlPublicPhoto,
       ride.customerPublicPhoto,
-    ].filter(Boolean) // remove undefined/null values
+    ].filter(Boolean)
 
     await Promise.all(photoPaths.map((path) => deleteFromCloudinary(path)))
 
