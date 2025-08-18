@@ -268,6 +268,118 @@ const updateProfileImage = asyncHandler(async (req, res) => {
     .json(new ApiResponce(200, { user }, "Profile image updated successfully"))
 })
 
+const editProfile = asyncHandler(async (req, res) => {
+  const { username, email, newPassword, currentPassword } = req.body
+
+  // Check if at least one field is provided
+  if (!username && !email && !newPassword) {
+    throw new ApiError(
+      400,
+      "At least one field (username, email, or password) is required to update"
+    )
+  }
+
+  // Current password is required for any profile update
+  if (!currentPassword) {
+    throw new ApiError(400, "Current password is required to update profile")
+  }
+
+  // Find the current user
+  const user = await User.findById(req.user._id)
+
+  if (!user) {
+    throw new ApiError(404, "User not found")
+  }
+
+  // Verify current password
+  const isCurrentPasswordValid = await user.isPasswordCorrect(currentPassword)
+
+  if (!isCurrentPasswordValid) {
+    throw new ApiError(401, "Current password is incorrect")
+  }
+
+  // Prepare update object
+  const updateFields = {}
+
+  // Check if username is being updated and if it's available
+  if (username && username !== user.username) {
+    const existingUserWithUsername = await User.findOne({
+      username,
+      _id: { $ne: user._id },
+    })
+
+    if (existingUserWithUsername) {
+      throw new ApiError(409, "Username is already taken")
+    }
+
+    updateFields.username = username
+  }
+
+  // Check if email is being updated and if it's available
+  if (email && email !== user.email) {
+    const existingUserWithEmail = await User.findOne({
+      email,
+      _id: { $ne: user._id },
+    })
+
+    if (existingUserWithEmail) {
+      throw new ApiError(409, "Email is already registered")
+    }
+
+    updateFields.email = email
+  }
+
+  // If password is being updated, hash it
+  if (newPassword) {
+    if (newPassword.length < 6) {
+      throw new ApiError(400, "New password must be at least 6 characters long")
+    }
+
+    // Hash the new password
+    const bcrypt = await import("bcrypt")
+    updateFields.password = await bcrypt.hash(newPassword, 10)
+  }
+
+  // Update user
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: updateFields },
+    { new: true, runValidators: true }
+  ).select("-password -refreshToken")
+
+  if (!updatedUser) {
+    throw new ApiError(500, "Failed to update profile")
+  }
+
+  // If password was changed, invalidate all refresh tokens for security
+  if (newPassword) {
+    await User.findByIdAndUpdate(req.user._id, { $unset: { refreshToken: 1 } })
+
+    // Clear cookies and return response indicating re-login is required
+    return res
+      .status(200)
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .json(
+        new ApiResponce(
+          200,
+          { user: updatedUser, requireReauth: true },
+          "Profile updated successfully. Please log in again due to changes made."
+        )
+      )
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponce(
+        200,
+        { user: updatedUser },
+        "Profile updated successfully"
+      )
+    )
+})
+
 export {
   registerUser,
   loginUser,
@@ -275,4 +387,5 @@ export {
   refreshAccessToken,
   changeCurrentPassword,
   updateProfileImage,
+  editProfile,
 }

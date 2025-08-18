@@ -5,6 +5,7 @@ import {
   refreshAccessToken,
   registerUser,
   updateProfileImage,
+  editProfile,
 } from "../controllers/user.controller.js"
 import { Router } from "express"
 import { upload } from "../middlewares/multer.middleware.js"
@@ -36,4 +37,5 @@ router.route("/update-profile-image").patch(
   ]),
   updateProfileImage
 )
+router.route("/edit-profile").patch(verifyJwt, editProfile)
 export default router
