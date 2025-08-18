@@ -23,7 +23,7 @@ export async function processRidePhotosInBackground(rideID, fileData) {
     }
 
     if (aadharPhoto.status === "fulfilled" && aadharPhoto.value) {
-      updateData.aadharPhoto = aadharPhoto.value.url
+      updateData.aadharPhoto = aadharPhoto.value.secure_url
       updateData.aadharPublicPhoto = aadharPhoto.value.public_id
     } else {
       updateData.aadharPhotoError = "Upload Failed"
@@ -31,7 +31,7 @@ export async function processRidePhotosInBackground(rideID, fileData) {
     }
 
     if (dlPhoto.status === "fulfilled" && dlPhoto.value) {
-      updateData.dlPhoto = dlPhoto.value.url
+      updateData.dlPhoto = dlPhoto.value.secure_url
       updateData.dlPublicPhoto = dlPhoto.value.public_id
     } else {
       updateData.dlPhotoError = "Upload Failed"
@@ -39,7 +39,7 @@ export async function processRidePhotosInBackground(rideID, fileData) {
     }
 
     if (customerPhoto.status === "fulfilled" && customerPhoto.value) {
-      updateData.customerPhoto = customerPhoto.value.url
+      updateData.customerPhoto = customerPhoto.value.secure_url
       updateData.customerPublicPhoto = customerPhoto.value.public_id
     } else {
       updateData.customerPhotoError = "Upload Failed"
