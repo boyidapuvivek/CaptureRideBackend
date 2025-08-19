@@ -1,6 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
 import { User } from "../models/user.models.js"
+import { OTP } from "../models/otp.models.js"
 import {
   uploadToCloudinary,
   uploadToCloudinaryFromBuffer,
@@ -210,7 +211,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req?.body
-  console.log(oldPassword, newPassword, req.cookies)
 
   const user = await User.findOne({ refreshToken: req.cookies?.refreshToken })
 
@@ -380,6 +380,79 @@ const editProfile = asyncHandler(async (req, res) => {
     )
 })
 
+const resetPassword = asyncHandler(async (req, res) => {
+  const { email, newPassword } = req.body
+
+  if (!email || !newPassword) {
+    throw new ApiError(400, "Email and new password are required")
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    throw new ApiError(400, "Please provide a valid email address")
+  }
+
+  // Validate password strength
+  if (newPassword.length < 6) {
+    throw new ApiError(400, "Password must be at least 6 characters long")
+  }
+
+  if (!/^(?=.*[a-zA-Z])(?=.*\d)/.test(newPassword)) {
+    throw new ApiError(400, "Password must include letters and numbers")
+  }
+
+  try {
+    // Find user by email
+    const user = await User.findOne({ email })
+
+    if (!user) {
+      throw new ApiError(404, "No user found with this email address")
+    }
+
+    // Check if there's a recently verified OTP for password reset
+    const recentVerifiedOTP = await OTP.findOne({
+      email,
+      purpose: "password_reset",
+      isUsed: true,
+    })
+
+    if (!recentVerifiedOTP) {
+      throw new ApiError(
+        400,
+        "No verified OTP found. Please complete the verification process."
+      )
+    }
+
+    // Update user's password
+    user.password = newPassword
+    await user.save({ validateBeforeSave: false })
+
+    // Clear all refresh tokens for security
+    await User.findByIdAndUpdate(user._id, { $unset: { refreshToken: 1 } })
+
+    // Delete all OTPs for this email and purpose
+    await OTP.deleteMany({ email, purpose: "password_reset" })
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponce(
+          200,
+          { email },
+          "Password reset successfully. Please log in with your new password."
+        )
+      )
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error
+    }
+
+    console.error("Error in resetPassword:", error)
+    throw new ApiError(500, "Something went wrong while resetting password")
+  }
+})
+
 export {
   registerUser,
   loginUser,
@@ -388,4 +461,5 @@ export {
   changeCurrentPassword,
   updateProfileImage,
   editProfile,
+  resetPassword,
 }

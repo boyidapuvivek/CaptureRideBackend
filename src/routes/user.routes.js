@@ -6,6 +6,7 @@ import {
   registerUser,
   updateProfileImage,
   editProfile,
+  resetPassword,
 } from "../controllers/user.controller.js"
 import { Router } from "express"
 import { upload } from "../middlewares/multer.middleware.js"
@@ -38,4 +39,5 @@ router.route("/update-profile-image").patch(
   updateProfileImage
 )
 router.route("/edit-profile").patch(verifyJwt, editProfile)
+router.route("/reset-password").post(resetPassword)
 export default router
