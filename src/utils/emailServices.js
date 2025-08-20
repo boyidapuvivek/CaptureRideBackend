@@ -17,7 +17,6 @@ class EmailService {
   async verifyConnection() {
     try {
       await this.transporter.verify()
-      console.log("Email service is ready to send emails")
       return true
     } catch (error) {
       console.error("Email service configuration error:", error)
@@ -41,7 +40,6 @@ class EmailService {
       }
 
       const info = await this.transporter.sendMail(mailOptions)
-      console.log("OTP email sent successfully:", info.messageId)
       return { success: true, messageId: info.messageId }
     } catch (error) {
       console.error("Error sending OTP email:", error)
@@ -138,7 +136,6 @@ class EmailService {
       }
 
       const info = await this.transporter.sendMail(mailOptions)
-      console.log("Email sent successfully:", info.messageId)
       return { success: true, messageId: info.messageId }
     } catch (error) {
       console.error("Error sending email:", error)

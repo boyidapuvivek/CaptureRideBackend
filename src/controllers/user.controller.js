@@ -25,67 +25,65 @@ const generateAccessRefreshTokens = async (userId) => {
   return { accessToken, refreshToken }
 }
 
+//Logic Steps;
+
+//get user detils from frontend
+//check that all details are not empty
+//check username or email exists
+//check for images ---- take the avatar image
+//upload that to cloudinary ---- avatar
+
+//create user obj ---- creats entry in db
+//remove password and refress token field from response
+//check for user creation
+//return res
 const registerUser = asyncHandler(async (req, res) => {
-  //Logic Steps;
-
-  //get user detils from frontend
-  //check that all details are not empty
-  //check username or email exists
-  //check for images ---- take the avatar image
-  //upload that to cloudinary ---- avatar
-
-  //create user obj ---- creats entry in db
-  //remove password and refress token field from response
-  //check for user creation
-  //return res
-
   const { username, email, password } = req.body
 
-  if (
-    [username, email, password].some((item) => {
-      item?.trim() === ""
+  try {
+    if (
+      [username, email, password].some((item) => {
+        item?.trim() === ""
+      })
+    ) {
+      throw new ApiError(400, "All Field are reqiured")
+    }
+
+    const userExist = await User.findOne({
+      $or: [{ username }, { email }],
     })
-  ) {
-    throw new ApiError(400, "All Field are reqiured")
+
+    if (userExist) {
+      throw new ApiError(401, "Username or the Email already exists", [
+        "Username or the Email already exists",
+      ])
+    }
+
+    const user = await User.create({
+      username,
+      email,
+      password,
+    })
+
+    const createdUser = await User.findById(user._id).select(
+      "-password -refreshToken"
+    )
+
+    if (!createdUser) {
+      throw new ApiError(500, "Something when wrong while registering the user")
+    }
+
+    return res
+      .status(201)
+      .json(new ApiResponce(201, createdUser, "User registerd successfully"))
+  } catch (error) {
+    if (error?.statusCode === 401) {
+      return res
+        .status(401)
+        .json({ error: error?.errors[0] || "Registration failed" })
+    }
+    return res.status(400).json({ error: "Registration failed" })
   }
-
-  const userExist = await User.findOne({
-    $or: [{ username }, { email }],
-  })
-
-  if (userExist) {
-    throw new ApiError(409, "Username or the Email already exists")
-  }
-
-  // const avatarLocalPath = req.files?.avatar[0]?.path;
-
-  // if (!avatarLocalPath) {
-  //   throw new ApiError(400, "Avatar is needed");
-  // }
-  // const avatar = await uploadToCloudinary(avatarLocalPath);
-
-  // if (!avatar) {
-  //   throw new ApiError(400, "Avatar field is required");
-  // }
-
-  const user = await User.create({
-    username,
-    email,
-    // avatar: avatar.url,
-    password,
-  })
-
-  const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken"
-  )
-
-  if (!createdUser) {
-    throw new ApiError(500, "Something when wrong while registering the user")
-  }
-
-  return res
-    .status(201)
-    .json(new ApiResponce(201, createdUser, "User registerd successfully"))
 })
 
 const loginUser = asyncHandler(async (req, res) => {
@@ -183,10 +181,8 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       throw new ApiError(401, "Invalid refresh token")
     }
 
-    console.log(user, "\n", incommingRefreshToken)
-
     if (incommingRefreshToken !== user?.refreshToken) {
-      throw new ApiError(401, "Refresh token is already used or expired")
+      throw new ApiError(400, "Refresh token is already used or expired")
     }
 
     const { accessToken, newRefreshToken } = generateAccessRefreshTokens(
@@ -205,7 +201,17 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
         )
       )
   } catch (error) {
-    throw new ApiError(401, error?.message || "Invalid refresh token")
+    console.log(error)
+
+    if (error?.statusCode === 401) {
+      return res.status(401).json({ error: error?.message || "Unauthorized" })
+    }
+    if (error?.statusCode === 401) {
+      return res.status(400).json({
+        error: error?.message || "Refresh token is already used or expired",
+      })
+    }
+    return res.status(400).json({ error: "Logout failed" })
   }
 })
 
