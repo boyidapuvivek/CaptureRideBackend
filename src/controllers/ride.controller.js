@@ -80,16 +80,31 @@ const addRide = asyncHandler(async (req, res) => {
 const getRides = asyncHandler(async (req, res) => {
   try {
     const userId = req?.user?._id
-    const { page = 1, limit = 10 } = req.query
+    const { page = 1, limit = 10, search } = req.query
     const skip = (page - 1) * limit
 
+    // Build search query
+    let searchQuery = { userId: userId }
+
+    if (search && search.trim()) {
+      const searchTerm = search.trim()
+      const searchRegex = new RegExp(searchTerm, "i") // Case-insensitive search
+
+      searchQuery.$or = [
+        { customerName: searchRegex },
+        { roomNumber: searchRegex },
+        { phoneNumber: searchRegex },
+        { vehicleNumber: searchRegex },
+      ]
+    }
+
     const [rides, total] = await Promise.all([
-      Ride.find({ userId: userId })
+      Ride.find(searchQuery)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
         .lean(),
-      Ride.countDocuments({ userId: userId }),
+      Ride.countDocuments(searchQuery),
     ])
 
     if (!rides || rides.length === 0) {
@@ -105,8 +120,9 @@ const getRides = asyncHandler(async (req, res) => {
               hasNext: false,
               hasPrev: page > 1,
             },
+            searchTerm: search || null,
           },
-          "No rides found"
+          search ? `No rides found matching "${search}"` : "No rides found"
         )
       )
     }
@@ -123,8 +139,11 @@ const getRides = asyncHandler(async (req, res) => {
             hasNext: page * limit < total,
             hasPrev: page > 1,
           },
+          searchTerm: search || null,
         },
-        "Rides fetched successfully"
+        search ?
+          `Found ${rides.length} rides matching "${search}"`
+        : "Rides fetched successfully"
       )
     )
   } catch (error) {
@@ -175,4 +194,53 @@ const deleteRide = asyncHandler(async (req, res) => {
   }
 })
 
-export { addRide, getRides, deleteRide }
+// Optional: Add a dedicated search endpoint for better performance with large datasets
+const searchRides = asyncHandler(async (req, res) => {
+  try {
+    const userId = req?.user?._id
+    const { q: searchTerm, limit = 20 } = req.query
+
+    if (!searchTerm || !searchTerm.trim()) {
+      throw new ApiError(400, "Search term is required")
+    }
+
+    const searchRegex = new RegExp(searchTerm.trim(), "i")
+
+    const rides = await Ride.find({
+      userId: userId,
+      $or: [
+        { customerName: searchRegex },
+        { roomNumber: searchRegex },
+        { phoneNumber: searchRegex },
+        { vehicleNumber: searchRegex },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .lean()
+
+    return res.status(200).json(
+      new ApiResponce(
+        200,
+        {
+          rides,
+          searchTerm,
+          totalFound: rides.length,
+        },
+        `Found ${rides.length} rides matching "${searchTerm}"`
+      )
+    )
+  } catch (error) {
+    console.error("Error searching rides:", error)
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        success: false,
+        message: "Search failed",
+        error: error.message,
+      })
+    }
+  }
+})
+
+export { addRide, getRides, deleteRide, searchRides }

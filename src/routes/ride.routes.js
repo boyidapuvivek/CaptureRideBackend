@@ -3,6 +3,7 @@ import {
   addRide,
   deleteRide,
   getRides,
+  searchRides,
 } from "../controllers/ride.controller.js"
 import { upload } from "../middlewares/multer.middleware.js"
 import verifyJwt from "../middlewares/auth.middleware.js"
@@ -30,5 +31,6 @@ router.route("/addRide").post(
 
 router.route("/getRides").get(verifyJwt, getRides)
 router.route("/deleteRide").delete(verifyJwt, deleteRide)
+router.route("/searchRides").get(verifyJwt, searchRides)
 
 export default router
